@@ -1,167 +1,152 @@
+## 📌 Overview
 
-# CS525 – Assignment 1: Storage Manager
+This project implements a **Storage Manager** module for a simple Database Management System (DBMS).  
+The storage manager is responsible for managing **page-based file I/O**, allowing pages to be read from disk into memory and written back to disk.
 
-## Build & Run Instructions
+This assignment serves as the foundation for later components such as the **Buffer Manager** and **Record Manager**.
 
-### 1. Clone or extract the code
-```bash
-git clone (https://github.com/CS525-ADO-F25/CS525-F25-G25.git)
-cd CS525-F25-G25/assign1
-````
-
-### 2. Dependencies
-
-* **Linux/macOS/WSL**
-
-  * GCC (version 9+ recommended)
-  * GNU Make
-  * No external libraries beyond the standard C library
-
-* **Windows**
-
-  * Install [MSYS2](https://www.msys2.org/)
-  * Use the **UCRT64** or **MinGW64** shell
-  * Install build tools:
-
-    ```bash
-    pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-make
-  * Use `mingw32-make` instead of `make`
-
-### 3. Build the project
-
-* On **Linux/macOS/WSL**:
-
-  ```bash
-  make
-* On **Windows (MSYS2)**:
-
-  ```bash
-  mingw32-make
-This creates an executable named `test_assign1` (or `test_assign1.exe` on Windows).
-
-### 4. Run the tests
-
-* On **Linux/macOS/WSL**:
-
-  ```bash
-  ./test_assign1
-* On **Windows**:
-
-  ```bash
-  ./test_assign1.exe
-Expected output: multiple `OK:` lines from the provided tests (`testCreateOpenClose`, `testSinglePageContent`) confirming that page files are created, read, written, and destroyed correctly.
-
-### 5. Clean & rebuild (optional)
-
-* Linux/macOS/WSL:
-
-  ```bash
-  make clean && make
-* Windows (MSYS2):
-
-  ```bash
-  mingw32-make clean && mingw32-make
 ---
 
-## Code Structure
+## 🎯 Objectives
+
+The Storage Manager supports the following functionality:
+
+- Page-based file access with a fixed page size
+- Creating, opening, closing, and deleting page files
+- Reading pages using both absolute and relative addressing
+- Writing pages to disk
+- Automatically extending files when capacity is insufficient
+
+---
+
+## 🧱 Core Concepts
+
+### Page Management
+- Files are divided into **fixed-size pages** (`PAGE_SIZE`)
+- Each page can be read or written independently
+- Pages are addressed using page numbers starting from 0
+
+### File Metadata
+Each open file is represented by a file handle that stores:
+- File name
+- Total number of pages
+- Current page position
+- Internal management information (e.g., file descriptor)
+
+---
+
+## 🗂️ Data Structures
+
+### `SM_FileHandle`
+
+```c
+typedef struct SM_FileHandle {
+    char *fileName;
+    int totalNumPages;
+    int curPagePos;
+    void *mgmtInfo;
+} SM_FileHandle;
+````
+
+* Represents an open page file
+* `curPagePos` tracks the current read/write position
+* `mgmtInfo` is used for internal bookkeeping
+
+### `SM_PageHandle`
+
+```c
+typedef char *SM_PageHandle;
+```
+
+* Points to a memory region of size `PAGE_SIZE`
+* Used as the buffer for reading and writing pages
+
+---
+
+## 🔌 Storage Manager Interface
+
+The Storage Manager implements the interface defined in `storage_mgr.h`.
+
+### File Operations
+
+* `initStorageManager`
+* `createPageFile`
+* `openPageFile`
+* `closePageFile`
+* `destroyPageFile`
+
+### Read Operations
+
+* `readBlock`
+* `getBlockPos`
+* `readFirstBlock`
+* `readPreviousBlock`
+* `readCurrentBlock`
+* `readNextBlock`
+* `readLastBlock`
+
+### Write Operations
+
+* `writeBlock`
+* `writeCurrentBlock`
+* `appendEmptyBlock`
+* `ensureCapacity`
+
+All functions return an `RC` (return code) indicating success or the type of error.
+
+---
+
+## ⚠️ Error Handling
+
+* All return codes are defined in `dberror.h`
+* On success, functions return `RC_OK`
+* Errors such as attempting to read a non-existing page return appropriate error codes
+* Error messages can be printed using `printError`
+
+---
+
+## 📁 Project Structure
 
 ```
 assign1/
-  dberror.h        # error codes, PAGE_SIZE, error handling macros
-  dberror.c        # error message utilities
-  storage_mgr.h    # interface definition (provided)
-  storage_mgr.c    # implementation (FILE* in mgmtInfo, all API functions)
-  test_helper.h    # macros for testing
-  test_assign1_1.c # provided test cases
-  Makefile         # builds the test executable
-  README.md        # this file
+├── README.md
+├── dberror.c
+├── dberror.h
+├── storage_mgr.c
+├── storage_mgr.h
+├── test_assign1_1.c
+├── test_helper.h
+└── Makefile
 ```
 
 ---
 
-## Function Explanations
+## 🧪 Testing
 
-### File management
+* The provided test file `test_assign1_1.c` validates:
 
-* **initStorageManager()**
-  Initializes the storage manager. Currently a no-op, but sets up global state if needed.
-
-* **createPageFile(fileName)**
-  Creates a new page file with exactly one zero-filled page (4096 bytes).
-
-* **openPageFile(fileName, fHandle)**
-  Opens an existing file in `rb+` mode.
-  Initializes the file handle:
-
-  * `fileName` (duplicated and stored)
-  * `totalNumPages = filesize / PAGE_SIZE`
-  * `curPagePos = 0`
-  * `mgmtInfo` stores a pointer to `FILE*`.
-
-* **closePageFile(fHandle)**
-  Closes the file, frees the `mgmtInfo` struct, frees the duplicated `fileName`, and resets the fields.
-
-* **destroyPageFile(fileName)**
-  Deletes the file from disk. Returns `RC_FILE_NOT_FOUND` if the file cannot be removed.
+  * File creation and deletion
+  * Page reads and writes
+  * Page boundary conditions
+* The `Makefile` builds an executable named `test_assign1`
+* Additional tests were written to ensure robustness
 
 ---
 
-### Reading
+## 🛠️ Build Instructions
 
-* **readBlock(pageNum, fHandle, memPage)**
-  Reads the page at position `pageNum` into `memPage`. Updates `curPagePos`.
-  Returns `RC_READ_NON_EXISTING_PAGE` if out-of-bounds.
+```bash
+make
+```
 
-* **readFirstBlock / readLastBlock / readCurrentBlock / readNextBlock / readPreviousBlock**
-  Convenience wrappers around `readBlock` that read relative to the current position.
-
-* **getBlockPos(fHandle)**
-  Returns the current page position (`curPagePos`).
+This will compile all source files and generate the `test_assign1` executable.
 
 ---
 
-### Writing
+## ✅ Status
 
-* **writeBlock(pageNum, fHandle, memPage)**
-  Writes the contents of `memPage` into the page at index `pageNum`. Updates `curPagePos`.
-  Returns `RC_WRITE_FAILED` if out-of-bounds or write fails.
-
-* **writeCurrentBlock(fHandle, memPage)**
-  Writes to the current page (`curPagePos`).
+* All required functionalities implemented
+* All provided test cases pass successfully
+* Code is modular, well-documented, and follows the specified interface
 
 ---
-
-### Growing the file
-
-* **appendEmptyBlock(fHandle)**
-  Appends a new page filled with zeros to the end of the file. Increments `totalNumPages` and sets `curPagePos` to the new last page.
-
-* **ensureCapacity(N, fHandle)**
-  Ensures the file has at least `N` pages. If not, repeatedly calls `appendEmptyBlock`.
-
----
-
-
-### Screenshot of Output
-
-![alt text](image.png)
-![alt text](image-1.png)
-
----
-
-## Video Demonstration
-
-**Video Demo Link:** (https://www.loom.com/share/6671bf01356f4cebb2ff2b38b2d43553?sid=d051efe1-0df5-4a91-af51-d69fc4c8a366)
-
----
-
-## Notes & Design Choices
-
-* `openPageFile` duplicates `fileName` (`strdup`) to ensure safe lifetime; freed in `closePageFile`.
-* Defensive checks:
-
-  * Validate `NULL` handles and `NULL` page buffers.
-  * Reject files whose size is not a multiple of `PAGE_SIZE`.
-* `appendEmptyBlock` and `ensureCapacity` grow the file by writing zeroed pages.
-* `curPagePos` is always updated consistently after reads and writes.
-
